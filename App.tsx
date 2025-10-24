@@ -40,19 +40,23 @@ const App: React.FC = () => {
     );
   }
 
-  if (!session) {
-    return <AuthPage />;
-  }
-
+  // Use the Router as the top-level component to provide routing context everywhere.
   return (
-    <AppProvider session={session}>
-      <AppContent />
-    </AppProvider>
+    <Router>
+      {!session ? (
+        <AuthPage />
+      ) : (
+        <AppProvider session={session}>
+          <MainRoutes />
+        </AppProvider>
+      )}
+    </Router>
   );
 };
 
-// This component handles the routing logic based on user profile state.
-const AppContent: React.FC = () => {
+// This new component lives within the Router and AppProvider context.
+// It handles the conditional logic for what page to show.
+const MainRoutes: React.FC = () => {
   const { profile, loading } = useAppContext();
   const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
 
@@ -76,7 +80,7 @@ const AppContent: React.FC = () => {
       });
     }
   };
-
+  
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -85,30 +89,31 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Route to account setup if the user has a profile but no account.
+  // Render specific pages if user setup is not complete.
+  // These components can now safely use hooks like useNavigate because they are rendered within the Router context.
   if (profile && !profile.account_id) {
     return <AccountSetupPage />;
   }
 
-  // Route to set password if the user has an account but hasn't set their password yet (invited user).
   if (profile && profile.account_id && !profile.password_set_at) {
     return <SetPasswordPage />;
   }
 
+  // If the user is fully set up, render the main application layout and routes.
   return (
-    <Router>
-      <Layout showInstallButton={!!installPromptEvent} handleInstallPrompt={handleInstallPrompt}>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/operations" element={<OperationsPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/transfers" element={<TransferLogPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/audit-log" element={<AuditLogPage />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <Layout showInstallButton={!!installPromptEvent} handleInstallPrompt={handleInstallPrompt}>
+      <Routes>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/operations" element={<OperationsPage />} />
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/transfers" element={<TransferLogPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/audit-log" element={<AuditLogPage />} />
+        {/* Add a catch-all route to redirect to dashboard if no other route matches */}
+        <Route path="*" element={<DashboardPage />} />
+      </Routes>
+    </Layout>
   );
 };
 

@@ -1,105 +1,99 @@
-import { User } from '@supabase/supabase-js';
-
-export interface Account {
-  id: string;
-  name: string;
-  owner_id: string;
-  created_at: string;
-}
-
+// Defines the shape of a user profile, linking a user to an account.
 export interface Profile {
-  id: string; // user id from auth
-  account_id: string;
+  id: string; // Corresponds to Supabase auth user ID
   email: string;
+  account_id: string; // The account (organization/tenant) the user belongs to
 }
 
-// Base type for all database records
-// FIX: Export DbRecord so it can be used as a type constraint in other files.
-export interface DbRecord {
+// Represents a surgical operation record.
+export interface Operation {
   id: string;
-  account_id: string;
-  created_at: string;
-  created_by: string; // user id
-}
-
-export interface JointType extends DbRecord {
-  name: string;
-}
-
-export interface Material extends DbRecord {
-  name: string;
-  minStockLevel: number;
+  patientName: string;
+  operationTypeId: string;
   jointTypeId: string;
-}
-
-export interface Warehouse extends DbRecord {
-  name: string;
-}
-
-export interface InventoryItem {
-  materialId: string;
+  technicianId?: string | null;
+  assistantTechnicianId?: string | null;
   warehouseId: string;
-  quantity: number;
-  // This is a view/join, not a table, so it doesn't need full DbRecord fields
+  materialsUsed: UsedMaterial[];
+  date: string; // ISO date string (e.g., "2023-10-27")
+  notes?: string | null;
+  priceUSD?: number | null;
+  priceSYP?: number | null;
+  doctorName?: string | null;
+  created_at: string;
+  account_id: string;
 }
 
-export interface Technician extends DbRecord {
-  name: string;
-}
-
-export interface OperationType extends DbRecord {
-  name: string;
-}
-
+// Details of a specific material used in an operation.
 export interface UsedMaterial {
   materialId: string;
   quantity: number;
 }
 
-export interface Operation extends DbRecord {
-  patientName: string;
-  operationTypeId: string;
-  jointTypeId: string;
-  doctorName?: string;
-  technicianId?: string;
-  assistantTechnicianId?: string;
+// Represents a type of material in the inventory.
+export interface Material {
+  id: string;
+  name: string;
+  minStockLevel: number;
+  jointTypeId?: string | null; // Can be linked to a joint type or be generic
+  account_id: string;
+}
+
+// Represents a physical warehouse or storage location.
+export interface Warehouse {
+  id: string;
+  name: string;
+  account_id: string;
+}
+
+// Represents a type of joint for operations.
+export interface JointType {
+  id: string;
+  name: string;
+  account_id: string;
+}
+
+// Represents a technician who can be assigned to operations.
+export interface Technician {
+  id: string;
+  name: string;
+  account_id: string;
+}
+
+// Represents a type of surgical operation.
+export interface OperationType {
+  id: string;
+  name: string;
+  account_id: string;
+}
+
+// Represents the stock quantity of a material in a specific warehouse.
+export interface InventoryItem {
+  id: number;
+  materialId: string;
   warehouseId: string;
-  materialsUsed: UsedMaterial[];
-  date: string;
-  notes?: string;
-  priceUSD?: number;
-  priceSYP?: number;
+  quantity: number;
+  account_id: string;
 }
 
-export interface StockTransfer extends DbRecord {
-    materialId: string;
-    fromWarehouseId: string;
-    toWarehouseId: string;
-    quantity: number;
-    date: string;
+// A log entry for when stock is transferred between warehouses.
+export interface StockTransfer {
+  id: string;
+  materialId: string;
+  fromWarehouseId: string;
+  toWarehouseId: string;
+  quantity: number;
+  date: string; // ISO timestamp
+  account_id: string;
 }
 
+// An entry in the audit log, tracking changes to data.
 export interface AuditLogEntry {
   id: number;
   created_at: string;
-  user_id: string;
   user_email: string;
   action_type: 'CREATE' | 'UPDATE' | 'DELETE';
   table_name: string;
   record_id: string;
-  old_data?: any;
-  new_data?: any;
-}
-
-
-export interface AppState {
-  jointTypes: JointType[];
-  materials: Material[];
-  warehouses: Warehouse[];
-  inventory: InventoryItem[];
-  technicians: Technician[];
-  operationTypes: OperationType[];
-  operations: Operation[];
-  stockTransfers: StockTransfer[];
-  profiles: Profile[];
+  account_id: string;
 }

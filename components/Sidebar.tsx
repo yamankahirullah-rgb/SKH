@@ -14,7 +14,12 @@ const navItems = [
   { to: '/settings', label: 'الإعدادات', icon: <Settings size={20} /> },
 ];
 
-const Sidebar: React.FC = () => {
+interface SidebarProps {
+  showInstallButton: boolean;
+  handleInstallPrompt: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ showInstallButton, handleInstallPrompt }) => {
   const navigate = useNavigate();
   const { session } = useAppContext();
   
@@ -25,10 +30,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <aside className="hidden md:flex md:flex-col md:w-64 bg-white text-black border-e">
-      <div className="p-4 border-b">
-        <img src="https://i.imgur.com/5n343kC.png" alt="Company Logo" className="h-12 mx-auto" />
-      </div>
-      <nav className="flex-1 p-4">
+      <nav className="flex-1 p-4 pt-6">
         <ul>
           {navItems.map(item => (
             <li key={item.to}>
@@ -48,6 +50,17 @@ const Sidebar: React.FC = () => {
               </NavLink>
             </li>
           ))}
+          {showInstallButton && (
+             <li>
+              <button
+                onClick={handleInstallPrompt}
+                className="flex items-center p-3 my-1 rounded-lg transition-colors duration-200 text-gray-600 hover:bg-red-100 hover:text-red-600 w-full"
+              >
+                <img src="https://i.imgur.com/8Q1z9gq.png" alt="Install Icon" className="w-5 h-5" />
+                <span className="ms-3">تثبيت التطبيق</span>
+              </button>
+            </li>
+          )}
         </ul>
       </nav>
       <div className="p-4 border-t">

@@ -1,13 +1,17 @@
-
-
 import React, { ReactNode } from 'react';
 import Sidebar from './Sidebar';
 import BottomNavBar from './BottomNavBar';
 
-const Layout: React.FC<{ children: ReactNode }> = ({ children }) => {
+interface LayoutProps {
+  children: ReactNode;
+  showInstallButton: boolean;
+  handleInstallPrompt: () => void;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children, showInstallButton, handleInstallPrompt }) => {
   return (
     <div className="flex h-screen bg-gray-100">
-      <Sidebar />
+      <Sidebar showInstallButton={showInstallButton} handleInstallPrompt={handleInstallPrompt} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 sm:p-6 lg:p-8 pb-20 md:pb-8">
           {children}

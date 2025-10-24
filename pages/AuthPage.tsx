@@ -34,7 +34,6 @@ const AuthPage: React.FC = () => {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
-        <img src="https://i.imgur.com/5n343kC.png" alt="Company Logo" className="h-16 mx-auto mb-4" />
         <div className="flex border-b">
           <button onClick={() => setIsLogin(true)} className={`w-1/2 py-3 text-lg font-semibold ${isLogin ? 'border-b-2 border-red-600 text-red-600' : 'text-gray-500'}`}>
             تسجيل الدخول

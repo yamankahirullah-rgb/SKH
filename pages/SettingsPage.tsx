@@ -2,28 +2,131 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import Modal from '../components/Modal';
 import ConfirmationModal from '../components/ConfirmationModal';
-import { JointType, Material, Warehouse, Technician, OperationType } from '../types';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { JointType, Material, Warehouse, Technician, OperationType, Profile } from '../types';
+import { Plus, Edit, Trash2, Send, User as UserIcon } from 'lucide-react';
+import { supabase } from '../supabase/client';
 
-// A generic type for the items we are managing
 type SettingsItem = JointType | Material | Warehouse | Technician | OperationType;
-
-// To identify which section we're working with
 type ItemType = 'jointTypes' | 'materials' | 'warehouses' | 'technicians' | 'operationTypes';
+type ActiveTab = ItemType | 'users';
 
 const SettingsPage: React.FC = () => {
+  const context = useAppContext();
+  const [activeTab, setActiveTab] = useState<ActiveTab>('users');
+
+  const tabs: { id: ActiveTab; label: string }[] = [
+    { id: 'users', label: 'المستخدمون' },
+    { id: 'materials', label: 'المواد' },
+    { id: 'jointTypes', label: 'أنواع المفاصل' },
+    { id: 'warehouses', label: 'المستودعات' },
+    { id: 'technicians', label: 'الفنيون' },
+    { id: 'operationTypes', label: 'أنواع العمليات' },
+  ];
+
+  return (
+    <div>
+      <h1 className="text-3xl font-bold text-black mb-6">الإعدادات</h1>
+      <div className="flex border-b mb-6">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 -mb-px font-semibold border-b-2 transition-colors duration-200 ${
+              activeTab === tab.id
+                ? 'border-red-600 text-red-600'
+                : 'border-transparent text-gray-500 hover:text-red-600'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div>
+        {activeTab === 'users' ? <UsersTab /> : <SettingsTab itemType={activeTab} />}
+      </div>
+    </div>
+  );
+};
+
+const UsersTab: React.FC = () => {
+    const { profiles, session } = useAppContext();
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+
+    const handleInvite = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError(null);
+        setMessage(null);
+
+        const { error } = await supabase.functions.invoke('invite-user', {
+            body: { email: inviteEmail },
+        });
+        
+        if (error) {
+            setError(error.message || 'حدث خطأ أثناء إرسال الدعوة.');
+        } else {
+            setMessage(`تم إرسال دعوة بنجاح إلى ${inviteEmail}`);
+            setInviteEmail('');
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-md">
+            <h2 className="text-2xl font-bold text-black mb-4">دعوة مستخدم جديد</h2>
+            <form onSubmit={handleInvite} className="flex flex-col sm:flex-row items-center gap-2 mb-6">
+                <input
+                    type="email"
+                    placeholder="أدخل البريد الإلكتروني للمستخدم"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    className="w-full p-2 border rounded-lg focus:ring-red-500 focus:border-red-500"
+                />
+                <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400"
+                >
+                    <Send size={16} className="me-2" />
+                    {loading ? '...جاري الإرسال' : 'إرسال دعوة'}
+                </button>
+            </form>
+            {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
+            {message && <p className="text-sm text-green-600 mb-4">{message}</p>}
+
+            <h2 className="text-2xl font-bold text-black mb-4">المستخدمون الحاليون</h2>
+            <ul className="divide-y">
+                {profiles.map(profile => (
+                    <li key={profile.id} className="flex items-center justify-between p-3">
+                        <div className="flex items-center">
+                            <UserIcon size={20} className="text-gray-500 me-3" />
+                            <span className="text-black">{profile.email}</span>
+                        </div>
+                        {profile.id === session.user.id && (
+                            <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">أنت</span>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+};
+
+
+const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   const context = useAppContext();
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   
-  const [modalType, setModalType] = useState<ItemType | null>(null);
   const [currentItem, setCurrentItem] = useState<SettingsItem | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<{ id: string; type: ItemType } | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<SettingsItem>>({});
-
-  // FIX: The `fields` property is changed to `string[]` to allow for properties
-  // that are not common to all `SettingsItem` types (e.g., 'minStockLevel').
+  
   const typeConfig: { [key in ItemType]: { title: string; fields: string[]; data: SettingsItem[]; crud: any } } = {
     jointTypes: { title: 'أنواع المفاصل', fields: ['name'], data: context.jointTypes, crud: { add: context.addJointType, update: context.updateJointType, delete: context.deleteJointType } },
     materials: { title: 'المواد', fields: ['name', 'minStockLevel', 'jointTypeId'], data: context.materials, crud: { add: context.addMaterial, update: context.updateMaterial, delete: context.deleteMaterial } },
@@ -31,17 +134,17 @@ const SettingsPage: React.FC = () => {
     technicians: { title: 'الفنيون', fields: ['name'], data: context.technicians, crud: { add: context.addTechnician, update: context.updateTechnician, delete: context.deleteTechnician } },
     operationTypes: { title: 'أنواع العمليات', fields: ['name'], data: context.operationTypes, crud: { add: context.addOperationType, update: context.updateOperationType, delete: context.deleteOperationType } },
   };
+  
+  const config = typeConfig[itemType];
 
-  const openModal = (type: ItemType, item: SettingsItem | null) => {
-    setModalType(type);
+  const openModal = (item: SettingsItem | null) => {
     setCurrentItem(item);
-    setFormData(item ? { ...item } : (type === 'materials' ? { minStockLevel: 0 } : {}));
+    setFormData(item ? { ...item } : (itemType === 'materials' ? { name: '', minStockLevel: 0 } : {name: ''}));
     setModalOpen(true);
   };
 
   const closeModal = () => {
     setModalOpen(false);
-    setModalType(null);
     setCurrentItem(null);
     setFormData({});
   };
@@ -52,39 +155,30 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleSubmit = () => {
-    if (!modalType) return;
-    const config = typeConfig[modalType];
-    
-    // Basic validation
     if (!('name' in formData) || !formData.name) {
         alert("الاسم حقل مطلوب.");
         return;
     }
-
     if (currentItem) {
       config.crud.update({ ...formData, id: currentItem.id });
     } else {
-      // FIX: Cast to any to avoid complex type issues with Omit<T, ...>
       config.crud.add(formData as any);
     }
     closeModal();
   };
 
-  const handleDeleteClick = (id: string, type: ItemType) => {
-    setItemToDelete({ id, type });
+  const handleDeleteClick = (id: string) => {
+    setItemToDelete(id);
     setConfirmOpen(true);
   };
 
   const confirmDelete = () => {
     if (!itemToDelete) return;
-    const { id, type } = itemToDelete;
-    typeConfig[type].crud.delete(id);
+    config.crud.delete(itemToDelete);
     setConfirmOpen(false);
     setItemToDelete(null);
   };
-
-  // FIX: The `field` parameter type is changed to `string` to match the updated `typeConfig`
-  // and resolve comparison errors.
+  
   const renderField = (field: string) => {
     if (field === 'jointTypeId') {
         return (
@@ -98,11 +192,7 @@ const SettingsPage: React.FC = () => {
             </div>
         )
     }
-    const labelMap: { [key: string]: string } = {
-        name: 'الاسم',
-        minStockLevel: 'الحد الأدنى للمخزون'
-    }
-
+    const labelMap: { [key: string]: string } = { name: 'الاسم', minStockLevel: 'الحد الأدنى للمخزون' }
     return (
         <div key={field} className="mb-4">
             <label className="block text-black text-sm font-bold mb-2">{labelMap[field] || field}</label>
@@ -118,75 +208,51 @@ const SettingsPage: React.FC = () => {
     )
   }
 
-  const renderModalContent = () => {
-    if (!modalType) return null;
-    const fields = typeConfig[modalType].fields;
-    // FIX: Removed unnecessary cast after changing field types.
-    return fields.map(field => renderField(field));
-  };
+  const renderModalContent = () => config.fields.map(field => renderField(field));
 
-  const renderTable = (type: ItemType) => {
-    const config = typeConfig[type];
-    const { title, data } = config;
-
-    return (
-      <div className="bg-white p-6 rounded-xl shadow-md">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-black">{title}</h2>
-          <button onClick={() => openModal(type, null)} className="flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
-            <Plus size={20} className="me-2" />
-            إضافة
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-right">
-                <thead className="bg-gray-50">
-                    <tr className="border-b">
-                        <th className="p-3 text-black font-semibold">الاسم</th>
-                        {type === 'materials' && <th className="p-3 text-black font-semibold">الحد الأدنى</th>}
-                        {type === 'materials' && <th className="p-3 text-black font-semibold">نوع المفصل</th>}
-                        <th className="p-3"></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y">
-                    {data.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="p-3 text-black">{item.name}</td>
-                            {type === 'materials' && <td className="p-3 text-black">{(item as Material).minStockLevel}</td>}
-                            {type === 'materials' && <td className="p-3 text-black">{context.jointTypes.find(jt => jt.id === (item as Material).jointTypeId)?.name || ((item as Material).jointTypeId ? 'عام' : '-')}</td>}
-                            <td className="p-3">
-                                <div className="flex items-center justify-end space-x-2 space-x-reverse">
-                                    <button onClick={() => openModal(type, item)} className="text-gray-500 hover:text-red-600"><Edit size={20} /></button>
-                                    <button onClick={() => handleDeleteClick(item.id, type)} className="text-gray-500 hover:text-red-600"><Trash2 size={20} /></button>
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
-                    {data.length === 0 && (
-                        <tr><td colSpan={type === 'materials' ? 4 : 2} className="text-center p-4 text-gray-500">لا توجد بيانات.</td></tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-      </div>
-    );
-  };
-  
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-black mb-6">الإعدادات</h1>
-      <div className="space-y-8">
-        {renderTable('jointTypes')}
-        {renderTable('materials')}
-        {renderTable('warehouses')}
-        {renderTable('technicians')}
-        {renderTable('operationTypes')}
+    <div className="bg-white p-6 rounded-xl shadow-md">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-black">{config.title}</h2>
+        <button onClick={() => openModal(null)} className="flex items-center justify-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+          <Plus size={20} className="me-2" />
+          إضافة
+        </button>
       </div>
-      
-      <Modal 
+      <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-right">
+              <thead className="bg-gray-50">
+                  <tr className="border-b">
+                      <th className="p-3 text-black font-semibold">الاسم</th>
+                      {itemType === 'materials' && <th className="p-3 text-black font-semibold">الحد الأدنى</th>}
+                      {itemType === 'materials' && <th className="p-3 text-black font-semibold">نوع المفصل</th>}
+                      <th className="p-3"></th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y">
+                  {config.data.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                          <td className="p-3 text-black">{item.name}</td>
+                          {itemType === 'materials' && <td className="p-3 text-black">{(item as Material).minStockLevel}</td>}
+                          {itemType === 'materials' && <td className="p-3 text-black">{context.jointTypes.find(jt => jt.id === (item as Material).jointTypeId)?.name || ((item as Material).jointTypeId ? 'عام' : '-')}</td>}
+                          <td className="p-3">
+                              <div className="flex items-center justify-end space-x-2 space-x-reverse">
+                                  <button onClick={() => openModal(item)} className="text-gray-500 hover:text-red-600"><Edit size={20} /></button>
+                                  <button onClick={() => handleDeleteClick(item.id)} className="text-gray-500 hover:text-red-600"><Trash2 size={20} /></button>
+                              </div>
+                          </td>
+                      </tr>
+                  ))}
+                  {config.data.length === 0 && (
+                      <tr><td colSpan={itemType === 'materials' ? 4 : 2} className="text-center p-4 text-gray-500">لا توجد بيانات.</td></tr>
+                  )}
+              </tbody>
+          </table>
+      </div>
+       <Modal 
         isOpen={isModalOpen} 
         onClose={closeModal} 
-        title={`${currentItem ? 'تعديل' : 'إضافة'} ${modalType ? typeConfig[modalType].title : ''}`}
+        title={`${currentItem ? 'تعديل' : 'إضافة'} ${config.title}`}
         footer={<>
             <button onClick={closeModal} className="px-4 py-2 bg-gray-200 rounded">إلغاء</button>
             <button onClick={handleSubmit} className="px-4 py-2 bg-red-600 text-white rounded">{currentItem ? 'حفظ' : 'إضافة'}</button>
@@ -194,7 +260,6 @@ const SettingsPage: React.FC = () => {
       >
         {renderModalContent()}
       </Modal>
-
       <ConfirmationModal 
         isOpen={isConfirmOpen} 
         onClose={() => setConfirmOpen(false)} 

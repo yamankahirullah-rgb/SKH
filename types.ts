@@ -101,4 +101,5 @@ export interface AppState {
   operationTypes: OperationType[];
   operations: Operation[];
   stockTransfers: StockTransfer[];
+  profiles: Profile[];
 }

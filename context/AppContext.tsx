@@ -52,6 +52,7 @@ const initialAppState: AppState = {
     operationTypes: [],
     operations: [],
     stockTransfers: [],
+    profiles: [],
 };
 
 // AppProvider component
@@ -76,7 +77,7 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
 
     const fetchInitialData = async () => {
         const [
-            jointTypes, materials, warehouses, technicians, operationTypes, operations, stockTransfers, inventory
+            jointTypes, materials, warehouses, technicians, operationTypes, operations, stockTransfers, inventory, profiles
         ] = await Promise.all([
             supabase.from('joint_types').select('*').eq('account_id', accountId),
             supabase.from('materials').select('*').eq('account_id', accountId),
@@ -85,7 +86,8 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
             supabase.from('operation_types').select('*').eq('account_id', accountId),
             supabase.from('operations').select('*').eq('account_id', accountId),
             supabase.from('stock_transfers').select('*').eq('account_id', accountId),
-            supabase.from('inventory_view').select('*').eq('account_id', accountId)
+            supabase.from('inventory_view').select('*').eq('account_id', accountId),
+            supabase.from('profiles').select('*').eq('account_id', accountId)
         ]);
 
         setState({
@@ -97,6 +99,7 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
             operations: operations.data || [],
             stockTransfers: stockTransfers.data || [],
             inventory: inventory.data || [],
+            profiles: profiles.data || [],
         });
     };
     
@@ -115,6 +118,7 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
       supabase.channel('public:operation_types').on('postgres_changes', { event: '*', schema: 'public', table: 'operation_types' }, handleDbChanges).subscribe(),
       supabase.channel('public:operations').on('postgres_changes', { event: '*', schema: 'public', table: 'operations' }, handleDbChanges).subscribe(),
       supabase.channel('public:stock_transfers').on('postgres_changes', { event: '*', schema: 'public', table: 'stock_transfers' }, handleDbChanges).subscribe(),
+      supabase.channel('public:profiles').on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, handleDbChanges).subscribe(),
     ];
     
     return () => {
@@ -223,6 +227,7 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     addMaterial: materialCrud.addItem,
     updateMaterial: materialCrud.updateItem,
     deleteMaterial: materialCrud.deleteItem,
+
     addWarehouse: warehouseCrud.addItem,
     updateWarehouse: warehouseCrud.updateItem,
     deleteWarehouse: warehouseCrud.deleteItem,

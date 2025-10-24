@@ -3,6 +3,7 @@ export interface Profile {
   id: string; // Corresponds to Supabase auth user ID
   email: string;
   account_id: string; // The account (organization/tenant) the user belongs to
+  password_set_at?: string | null; // Tracks if the user has set their password
 }
 
 // Represents a surgical operation record.

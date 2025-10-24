@@ -14,10 +14,9 @@ const AccountSetupPage: React.FC = () => {
         setError(null);
 
         try {
-            // This should ideally be a single transaction or RPC call in Supabase.
             // 1. Create a new account record.
             const { data: accountData, error: accountError } = await supabase
-                .from('accounts') // Assumes an 'accounts' table exists.
+                .from('accounts')
                 .insert({ name: accountName })
                 .select()
                 .single();
@@ -29,10 +28,13 @@ const AccountSetupPage: React.FC = () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not found.");
 
-            // 3. Update the user's profile with the new account_id.
+            // 3. Update the user's profile with the new account_id AND mark password as set.
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({ account_id: accountData.id })
+                .update({ 
+                    account_id: accountData.id,
+                    password_set_at: new Date().toISOString() // Mark password as set for account creator
+                })
                 .eq('id', user.id);
 
             if (profileError) throw profileError;

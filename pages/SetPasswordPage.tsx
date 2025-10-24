@@ -11,13 +11,19 @@ const SetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // This effect listens for the PASSWORD_RECOVERY event which is triggered
-    // when a user lands on the site from an invite or password reset link.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setMessage('You can now set your new password.');
+      if (event === 'PASSWORD_RECOVERY' || event === 'USER_UPDATED') {
+        setMessage('يمكنك الآن تعيين كلمة المرور الخاصة بك.');
         setShowForm(true);
       }
+    });
+
+    // For invited users who are already logged in when they click the link
+    supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+            setMessage('مرحبًا بك! يرجى تعيين كلمة مرور لحسابك للمتابعة.');
+            setShowForm(true);
+        }
     });
 
     return () => {
@@ -28,20 +34,34 @@ const SetPasswordPage: React.FC = () => {
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.length < 6) {
-        setError("Password must be at least 6 characters long.");
+        setError("يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.");
         return;
     }
     setLoading(true);
     setError(null);
     setMessage(null);
 
-    const { error } = await supabase.auth.updateUser({ password: password });
+    const { data: { user }, error: updateUserError } = await supabase.auth.updateUser({ password });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setMessage('Your password has been updated successfully. You will be redirected to the login page.');
-      setTimeout(() => navigate('/'), 3000);
+    if (updateUserError) {
+      setError(updateUserError.message);
+      setLoading(false);
+      return;
+    }
+    
+    // After successfully setting the password, update the profile.
+    if (user) {
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ password_set_at: new Date().toISOString() })
+            .eq('id', user.id);
+        
+        if (profileError) {
+            setError("تم تحديث كلمة المرور، ولكن فشل تحديث الملف الشخصي. يرجى محاولة تسجيل الدخول.");
+        } else {
+            setMessage('تم تحديث كلمة المرور بنجاح. سيتم إعادة توجيهك الآن.');
+            setTimeout(() => navigate(0), 2000); // Reload the page
+        }
     }
     setLoading(false);
   };
@@ -51,7 +71,7 @@ const SetPasswordPage: React.FC = () => {
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg">
         <h2 className="text-2xl font-bold text-center text-black">تعيين كلمة المرور</h2>
         
-        {!showForm && <p className="text-center text-gray-600">If you're here from an invite or password reset link, the form will appear shortly...</p>}
+        {!showForm && <p className="text-center text-gray-600">جاري التحقق من بيانات الدعوة...</p>}
         
         {showForm && (
             <form onSubmit={handleSetPassword} className="space-y-6">
@@ -78,7 +98,7 @@ const SetPasswordPage: React.FC = () => {
                 disabled={loading}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-400"
                 >
-                {loading ? '...جاري الحفظ' : 'حفظ كلمة المرور'}
+                {loading ? '...جاري الحفظ' : 'حفظ كلمة المرور والمتابعة'}
                 </button>
             </div>
             </form>

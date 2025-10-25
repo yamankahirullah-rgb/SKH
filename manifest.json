@@ -1,15 +1,15 @@
 {
-  "short_name": "Khaiallah Med",
-  "name": "Khaiallah - نظام إدارة المعدات الطبية",
+  "short_name": "إدارة المفاصل",
+  "name": "نظام إدارة عمليات المفاصل الطبية",
   "description": "نظام شامل ومتكامل لإدارة عمليات المفاصل الطبية، بما في ذلك تتبع المواد والمخزون، وإدارة المستودعات، وإنشاء تقارير وإحصائيات ذكية.",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/192/8833/8833155.png",
+      "src": "/icon-192x192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/8833/8833155.png",
+      "src": "/icon-512x512.png",
       "type": "image/png",
       "sizes": "512x512"
     }

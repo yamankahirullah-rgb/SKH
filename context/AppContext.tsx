@@ -20,7 +20,6 @@ interface AppContextType {
   updateOperation: (operation: Partial<Operation> & { id: string }) => Promise<void>;
   deleteOperation: (operationId: string) => Promise<void>;
   transferMultipleStock: (items: { materialId: string; quantity: number }[], fromWarehouseId: string, toWarehouseId: string) => Promise<void>;
-  addStock: (items: { materialId: string; quantity: number }[], warehouseId: string) => Promise<void>;
   addJointType: (item: Omit<JointType, 'id' | 'account_id'>) => Promise<void>;
   updateJointType: (item: Partial<JointType> & { id: string }) => Promise<void>;
   deleteJointType: (id: string) => Promise<void>;
@@ -145,37 +144,6 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     }
     else await fetchData();
   }, [profile, fetchData]);
-
-  const addStock = useCallback(async (items: { materialId: string; quantity: number }[], warehouseId: string) => {
-    if (!profile?.account_id) return;
-    try {
-        const materialIds = items.map(item => item.materialId);
-        const { data: existingInventory, error: fetchError } = await supabase
-            .from('inventory')
-            .select('materialId, quantity')
-            .eq('warehouseId', warehouseId)
-            .in('materialId', materialIds);
-        if (fetchError) throw fetchError;
-        const inventoryMap = new Map<string, number>(existingInventory?.map(i => [i.materialId, i.quantity]));
-        const itemsToUpsert = items.map(item => {
-            const currentQuantity = inventoryMap.get(item.materialId) || 0;
-            return {
-                materialId: item.materialId,
-                warehouseId: warehouseId,
-                quantity: currentQuantity + item.quantity,
-                account_id: profile.account_id!,
-            };
-        });
-        const { error: upsertError } = await supabase
-            .from('inventory')
-            .upsert(itemsToUpsert, { onConflict: 'materialId, warehouseId' });
-        if (upsertError) throw upsertError;
-        await fetchData();
-    } catch (error: any) {
-        console.error("Error adding stock:", error);
-        alert(`Failed to add stock: ${error.message}`);
-    }
-  }, [profile, fetchData]);
   
   const createCrudFunctions = <T extends {id: string, account_id: string}>(tableName: string) => {
       const addItem = async (item: Omit<T, 'id' | 'account_id'>) => {
@@ -239,7 +207,7 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
   const value = {
     session, profile, profiles, operations, materials, warehouses, jointTypes, technicians,
     operationTypes, inventory, stockTransfers, loading, addOperation, updateOperation,
-    deleteOperation, transferMultipleStock, addStock, addJointType, updateJointType, deleteJointType,
+    deleteOperation, transferMultipleStock, addJointType, updateJointType, deleteJointType,
     addMaterial, updateMaterial, deleteMaterial, addWarehouse, updateWarehouse, deleteWarehouse,
     addTechnician, updateTechnician, deleteTechnician, addOperationType, updateOperationType, deleteOperationType
   };

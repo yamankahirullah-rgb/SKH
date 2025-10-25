@@ -20,6 +20,7 @@ interface AppContextType {
   updateOperation: (operation: Partial<Operation> & { id: string }) => Promise<void>;
   deleteOperation: (operationId: string) => Promise<void>;
   transferMultipleStock: (items: { materialId: string; quantity: number }[], fromWarehouseId: string, toWarehouseId: string) => Promise<void>;
+  addStock: (items: { materialId: string; quantity: number }[], warehouseId: string) => Promise<void>;
   addJointType: (item: Omit<JointType, 'id' | 'account_id'>) => Promise<void>;
   updateJointType: (item: Partial<JointType> & { id: string }) => Promise<void>;
   deleteJointType: (id: string) => Promise<void>;
@@ -144,6 +145,21 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     }
     else await fetchData();
   }, [profile, fetchData]);
+
+  const addStock = useCallback(async (items: { materialId: string; quantity: number }[], warehouseId: string) => {
+    if (!profile?.account_id) return;
+    // Assumes an RPC 'add_stock_multiple'
+    const { error } = await supabase.rpc('add_stock_multiple', {
+        p_account_id: profile.account_id,
+        items_to_add: items,
+        p_warehouse_id: warehouseId
+    });
+    if (error) {
+        console.error("Error adding stock:", error);
+        alert(`Failed to add stock: ${error.message}`);
+    }
+    else await fetchData();
+  }, [profile, fetchData]);
   
   const createCrudFunctions = <T extends {id: string, account_id: string}>(tableName: string) => {
       const addItem = async (item: Omit<T, 'id' | 'account_id'>) => {
@@ -172,7 +188,7 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
   const value = {
     session, profile, profiles, operations, materials, warehouses, jointTypes, technicians,
     operationTypes, inventory, stockTransfers, loading, addOperation, updateOperation,
-    deleteOperation, transferMultipleStock, addJointType, updateJointType, deleteJointType,
+    deleteOperation, transferMultipleStock, addStock, addJointType, updateJointType, deleteJointType,
     addMaterial, updateMaterial, deleteMaterial, addWarehouse, updateWarehouse, deleteWarehouse,
     addTechnician, updateTechnician, deleteTechnician, addOperationType, updateOperationType, deleteOperationType
   };

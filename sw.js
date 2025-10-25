@@ -1,12 +1,8 @@
-const CACHE_NAME = 'khaiallah-med-cache-v1.5';
+const CACHE_NAME = 'khaiallah-med-cache-v1.3';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
-  '/manifest.json',
-  '/favicon.png',
-  '/icon-192x192.png',
-  '/icon-512x512.png',
-  '/apple-touch-icon.png'
+  '/manifest.json'
 ];
 
 self.addEventListener('install', event => {

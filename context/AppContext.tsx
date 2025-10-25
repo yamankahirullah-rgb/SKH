@@ -173,27 +173,56 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
           .insert([{ ...materialData, account_id: profile.account_id }])
           .select('id')
           .single();
+
       if (materialError || !newMaterial) {
           console.error("Error adding material:", materialError);
           alert(`Failed to add material: ${materialError?.message}`);
           return;
       }
+
       if (initialStock && initialStock.length > 0) {
-          const stockToInsert = initialStock
-              .filter(stock => stock.quantity > 0)
-              .map(stock => ({
-                  materialId: newMaterial.id,
-                  warehouseId: stock.warehouseId,
-                  quantity: stock.quantity,
-                  account_id: profile.account_id,
-              }));
-          if (stockToInsert.length > 0) {
-               const { error: stockError } = await supabase.from('inventory').insert(stockToInsert);
-               if (stockError) {
-                   console.error("Error adding initial stock:", stockError);
-                   alert(`Material created, but failed to add initial stock: ${stockError.message}`);
-               }
+        const stockToAdd = initialStock.filter(stock => stock.quantity > 0);
+        for (const stockItem of stockToAdd) {
+          // Check if a record for this material and warehouse already exists
+          const { data: existingItem, error: selectError } = await supabase
+            .from('inventory')
+            .select('id')
+            .eq('materialId', newMaterial.id)
+            .eq('warehouseId', stockItem.warehouseId)
+            .maybeSingle(); // Use maybeSingle to avoid error if no row is found
+
+          if (selectError) {
+            console.error("Error checking for existing stock:", selectError);
+            alert(`Material created, but there was an error processing stock: ${selectError.message}`);
+            continue; // Skip to next item
           }
+
+          if (existingItem) {
+            // If it exists, update it with the new quantity
+            const { error: updateError } = await supabase
+              .from('inventory')
+              .update({ quantity: stockItem.quantity, account_id: profile.account_id })
+              .eq('id', existingItem.id);
+            if (updateError) {
+              console.error("Error updating initial stock:", updateError);
+              alert(`Material created, but failed to update stock for a warehouse: ${updateError.message}`);
+            }
+          } else {
+            // If it does not exist, insert a new record
+            const { error: insertError } = await supabase
+              .from('inventory')
+              .insert({
+                materialId: newMaterial.id,
+                warehouseId: stockItem.warehouseId,
+                quantity: stockItem.quantity,
+                account_id: profile.account_id,
+              });
+            if (insertError) {
+              console.error("Error inserting initial stock:", insertError);
+              alert(`Material created, but failed to insert stock for a warehouse: ${insertError.message}`);
+            }
+          }
+        }
       }
       await fetchData();
   }, [profile, fetchData]);

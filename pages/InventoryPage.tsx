@@ -10,18 +10,13 @@ interface StockItem {
 }
 
 const InventoryPage: React.FC = () => {
-  const { materials, warehouses, inventory, transferMultipleStock, addStock } = useAppContext();
+  const { materials, warehouses, inventory, transferMultipleStock } = useAppContext();
   
   // State for Transfer Modal
   const [isTransferModalOpen, setTransferModalOpen] = useState(false);
   const [fromWarehouse, setFromWarehouse] = useState('');
   const [toWarehouse, setToWarehouse] = useState('');
   const [transferItems, setTransferItems] = useState<StockItem[]>([{ materialId: '', quantity: 1 }]);
-  
-  // State for Add Stock Modal
-  const [isAddStockModalOpen, setAddStockModalOpen] = useState(false);
-  const [addStockWarehouseId, setAddStockWarehouseId] = useState('');
-  const [addStockItems, setAddStockItems] = useState<StockItem[]>([{ materialId: '', quantity: 1 }]);
 
   const [filter, setFilter] = useState('');
 
@@ -82,38 +77,6 @@ const InventoryPage: React.FC = () => {
   const addTransferItem = () => setTransferItems([...transferItems, {materialId: '', quantity: 1}]);
   const removeTransferItem = (index: number) => setTransferItems(transferItems.filter((_, i) => i !== index));
 
-  // Add Stock Modal Functions
-  const openAddStockModal = () => setAddStockModalOpen(true);
-  const closeAddStockModal = () => {
-      setAddStockModalOpen(false);
-      setAddStockWarehouseId('');
-      setAddStockItems([{ materialId: '', quantity: 1 }]);
-  };
-
-  const handleAddStock = () => {
-    if (!addStockWarehouseId) {
-        alert('يرجى اختيار المستودع.');
-        return;
-    }
-    const validItems = addStockItems.filter(item => item.materialId && item.quantity > 0);
-    if (validItems.length === 0) {
-        alert('يرجى إضافة مواد لإضافتها إلى المخزون.');
-        return;
-    }
-    addStock(validItems, addStockWarehouseId);
-    closeAddStockModal();
-  };
-
-  const handleAddStockItemChange = (index: number, field: keyof StockItem, value: string | number) => {
-    const newItems = [...addStockItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setAddStockItems(newItems);
-  };
-  
-  const addAddStockItem = () => setAddStockItems([...addStockItems, { materialId: '', quantity: 1 }]);
-  const removeAddStockItem = (index: number) => setAddStockItems(addStockItems.filter((_, i) => i !== index));
-
-
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
@@ -126,10 +89,6 @@ const InventoryPage: React.FC = () => {
                 onChange={e => setFilter(e.target.value)}
                 className="w-full sm:w-64 p-2 border rounded"
             />
-            <button onClick={openAddStockModal} className="flex-shrink-0 flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-              <Plus size={20} className="me-2" />
-              إضافة مخزون
-            </button>
             <button onClick={openTransferModal} className="flex-shrink-0 flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
               <ArrowRightLeft size={20} className="me-2" />
               تحويل مخزون
@@ -177,41 +136,6 @@ const InventoryPage: React.FC = () => {
           </tbody>
         </table>
       </div>
-      
-      {/* Add Stock Modal */}
-      <Modal isOpen={isAddStockModalOpen} onClose={closeAddStockModal} title="إضافة مخزون جديد" footer={
-        <>
-            <button onClick={closeAddStockModal} className="px-4 py-2 bg-gray-200 rounded">إلغاء</button>
-            <button onClick={handleAddStock} className="px-4 py-2 bg-red-600 text-white rounded">تأكيد الإضافة</button>
-        </>
-      }>
-        <div className="space-y-4">
-            <div>
-                <label className="block text-sm font-bold text-black mb-2">المستودع</label>
-                <select value={addStockWarehouseId} onChange={e => setAddStockWarehouseId(e.target.value)} className="w-full p-2 border rounded">
-                    <option value="">اختر المستودع...</option>
-                    {warehouses.map(wh => <option key={wh.id} value={wh.id}>{wh.name}</option>)}
-                </select>
-            </div>
-            <hr/>
-            <h4 className="font-semibold text-black">المواد المراد إضافتها</h4>
-            {addStockItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2">
-                    <select value={item.materialId} onChange={e => handleAddStockItemChange(index, 'materialId', e.target.value)} className="w-full p-2 border rounded">
-                        <option value="">اختر المادة...</option>
-                        {materials.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                    <input type="number" value={item.quantity} onChange={e => handleAddStockItemChange(index, 'quantity', Number(e.target.value))} className="w-24 p-2 border rounded" min="1" />
-                    <button onClick={() => removeAddStockItem(index)} className="text-red-500 hover:text-red-700 p-1">
-                        <MinusCircle size={20} />
-                    </button>
-                </div>
-            ))}
-            <button onClick={addAddStockItem} className="flex items-center text-red-600 mt-2">
-                <PlusCircle size={20} className="me-2" /> إضافة مادة أخرى
-            </button>
-        </div>
-      </Modal>
 
       {/* Transfer Stock Modal */}
       <Modal isOpen={isTransferModalOpen} onClose={closeTransferModal} title="تحويل مخزون" footer={

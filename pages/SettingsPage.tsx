@@ -156,7 +156,7 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'minStockLevel' ? Number(value) : value }));
+    setFormData(prev => ({ ...prev, [name]: name === 'minStockLevel' ? Math.max(0, Number(value)) : value }));
   };
 
   const handleStockChange = (warehouseId: string, quantity: number) => {

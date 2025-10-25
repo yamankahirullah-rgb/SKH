@@ -26,12 +26,12 @@ const SettingsPage: React.FC = () => {
   return (
     <div>
       <h1 className="text-3xl font-bold text-black mb-6">الإعدادات</h1>
-      <div className="flex border-b mb-6">
+      <div className="flex border-b mb-6 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 -mb-px font-semibold border-b-2 transition-colors duration-200 ${
+            className={`px-4 py-2 -mb-px font-semibold border-b-2 transition-colors duration-200 whitespace-nowrap flex-shrink-0 ${
               activeTab === tab.id
                 ? 'border-red-600 text-red-600'
                 : 'border-transparent text-gray-500 hover:text-red-600'

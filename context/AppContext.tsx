@@ -24,7 +24,7 @@ interface AppContextType {
   addJointType: (item: Omit<JointType, 'id' | 'account_id'>) => Promise<void>;
   updateJointType: (item: Partial<JointType> & { id: string }) => Promise<void>;
   deleteJointType: (id: string) => Promise<void>;
-  addMaterial: (item: Omit<Material, 'id' | 'account_id'>) => Promise<void>;
+  addMaterial: (item: Omit<Material, 'id' | 'account_id'>, initialStock?: { warehouseId: string; quantity: number }[]) => Promise<void>;
   updateMaterial: (item: Partial<Material> & { id: string }) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
   addWarehouse: (item: Omit<Warehouse, 'id' | 'account_id'>) => Promise<void>;
@@ -148,17 +148,33 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
 
   const addStock = useCallback(async (items: { materialId: string; quantity: number }[], warehouseId: string) => {
     if (!profile?.account_id) return;
-    // Assumes an RPC 'add_stock_multiple'
-    const { error } = await supabase.rpc('add_stock_multiple', {
-        p_account_id: profile.account_id,
-        items_to_add: items,
-        p_warehouse_id: warehouseId
-    });
-    if (error) {
+    try {
+        const materialIds = items.map(item => item.materialId);
+        const { data: existingInventory, error: fetchError } = await supabase
+            .from('inventory')
+            .select('materialId, quantity')
+            .eq('warehouseId', warehouseId)
+            .in('materialId', materialIds);
+        if (fetchError) throw fetchError;
+        const inventoryMap = new Map<string, number>(existingInventory?.map(i => [i.materialId, i.quantity]));
+        const itemsToUpsert = items.map(item => {
+            const currentQuantity = inventoryMap.get(item.materialId) || 0;
+            return {
+                materialId: item.materialId,
+                warehouseId: warehouseId,
+                quantity: currentQuantity + item.quantity,
+                account_id: profile.account_id!,
+            };
+        });
+        const { error: upsertError } = await supabase
+            .from('inventory')
+            .upsert(itemsToUpsert, { onConflict: 'materialId, warehouseId' });
+        if (upsertError) throw upsertError;
+        await fetchData();
+    } catch (error: any) {
         console.error("Error adding stock:", error);
         alert(`Failed to add stock: ${error.message}`);
     }
-    else await fetchData();
   }, [profile, fetchData]);
   
   const createCrudFunctions = <T extends {id: string, account_id: string}>(tableName: string) => {
@@ -179,8 +195,43 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
       return { addItem, updateItem, deleteItem };
   };
 
+  const addMaterial = useCallback(async (
+    materialData: Omit<Material, 'id' | 'account_id'>,
+    initialStock?: { warehouseId: string; quantity: number }[]
+  ) => {
+      if (!profile?.account_id) return;
+      const { data: newMaterial, error: materialError } = await supabase
+          .from('materials')
+          .insert([{ ...materialData, account_id: profile.account_id }])
+          .select('id')
+          .single();
+      if (materialError || !newMaterial) {
+          console.error("Error adding material:", materialError);
+          alert(`Failed to add material: ${materialError?.message}`);
+          return;
+      }
+      if (initialStock && initialStock.length > 0) {
+          const stockToInsert = initialStock
+              .filter(stock => stock.quantity > 0)
+              .map(stock => ({
+                  materialId: newMaterial.id,
+                  warehouseId: stock.warehouseId,
+                  quantity: stock.quantity,
+                  account_id: profile.account_id,
+              }));
+          if (stockToInsert.length > 0) {
+               const { error: stockError } = await supabase.from('inventory').insert(stockToInsert);
+               if (stockError) {
+                   console.error("Error adding initial stock:", stockError);
+                   alert(`Material created, but failed to add initial stock: ${stockError.message}`);
+               }
+          }
+      }
+      await fetchData();
+  }, [profile, fetchData]);
+
   const { addItem: addJointType, updateItem: updateJointType, deleteItem: deleteJointType } = createCrudFunctions('joint_types');
-  const { addItem: addMaterial, updateItem: updateMaterial, deleteItem: deleteMaterial } = createCrudFunctions('materials');
+  const { updateItem: updateMaterial, deleteItem: deleteMaterial } = createCrudFunctions('materials');
   const { addItem: addWarehouse, updateItem: updateWarehouse, deleteItem: deleteWarehouse } = createCrudFunctions('warehouses');
   const { addItem: addTechnician, updateItem: updateTechnician, deleteItem: deleteTechnician } = createCrudFunctions('technicians');
   const { addItem: addOperationType, updateItem: updateOperationType, deleteItem: deleteOperationType } = createCrudFunctions('operation_types');

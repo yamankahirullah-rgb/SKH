@@ -24,7 +24,7 @@ interface AppContextType {
   updateJointType: (item: Partial<JointType> & { id: string }) => Promise<void>;
   deleteJointType: (id: string) => Promise<void>;
   addMaterial: (item: Omit<Material, 'id' | 'account_id'>, initialStock?: { warehouseId: string; quantity: number }[]) => Promise<void>;
-  updateMaterial: (item: Partial<Material> & { id: string }) => Promise<void>;
+  updateMaterial: (item: Partial<Material> & { id: string }, stockLevels?: { warehouseId: string; quantity: number }[]) => Promise<void>;
   deleteMaterial: (id: string) => Promise<void>;
   addWarehouse: (item: Omit<Warehouse, 'id' | 'account_id'>) => Promise<void>;
   updateWarehouse: (item: Partial<Warehouse> & { id: string }) => Promise<void>;
@@ -227,8 +227,61 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
       await fetchData();
   }, [profile, fetchData]);
 
+  const updateMaterial = useCallback(async (
+    materialData: Partial<Material> & { id: string },
+    stockLevels?: { warehouseId: string; quantity: number }[]
+  ) => {
+    if (!profile?.account_id) return;
+
+    const { id, ...updateData } = materialData;
+    
+    // 1. Update material details
+    const { error: materialError } = await supabase
+        .from('materials')
+        .update(updateData)
+        .eq('id', id);
+
+    if (materialError) {
+        console.error("Error updating material:", materialError);
+        alert(`Failed to update material: ${materialError.message}`);
+        return;
+    }
+
+    // 2. Update stock levels
+    if (stockLevels) {
+        for (const stockItem of stockLevels) {
+            const { data: existingItem } = await supabase
+                .from('inventory')
+                .select('id')
+                .eq('materialId', id)
+                .eq('warehouseId', stockItem.warehouseId)
+                .maybeSingle();
+
+            if (existingItem) {
+                const { error } = await supabase
+                    .from('inventory')
+                    .update({ quantity: stockItem.quantity })
+                    .eq('id', existingItem.id);
+                if (error) console.error("Error updating stock:", error);
+            } else if (stockItem.quantity > 0) { // Only insert if there's stock
+                const { error } = await supabase
+                    .from('inventory')
+                    .insert({
+                        materialId: id,
+                        warehouseId: stockItem.warehouseId,
+                        quantity: stockItem.quantity,
+                        account_id: profile.account_id,
+                    });
+                if (error) console.error("Error inserting stock:", error);
+            }
+        }
+    }
+    
+    await fetchData();
+  }, [profile, fetchData]);
+
   const { addItem: addJointType, updateItem: updateJointType, deleteItem: deleteJointType } = createCrudFunctions('joint_types');
-  const { updateItem: updateMaterial, deleteItem: deleteMaterial } = createCrudFunctions('materials');
+  const { deleteItem: deleteMaterial } = createCrudFunctions('materials');
   const { addItem: addWarehouse, updateItem: updateWarehouse, deleteItem: deleteWarehouse } = createCrudFunctions('warehouses');
   const { addItem: addTechnician, updateItem: updateTechnician, deleteItem: deleteTechnician } = createCrudFunctions('technicians');
   const { addItem: addOperationType, updateItem: updateOperationType, deleteItem: deleteOperationType } = createCrudFunctions('operation_types');

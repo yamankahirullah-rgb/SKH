@@ -126,7 +126,7 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   const [currentItem, setCurrentItem] = useState<SettingsItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<SettingsItem>>({});
-  const [initialStock, setInitialStock] = useState<{ warehouseId: string, quantity: number }[]>([]);
+  const [materialStock, setMaterialStock] = useState<{ warehouseId: string, quantity: number }[]>([]);
   
   const typeConfig: { [key in ItemType]: { title: string; fields: string[]; data: SettingsItem[]; crud: any } } = {
     jointTypes: { title: 'أنواع المفاصل', fields: ['name'], data: context.jointTypes, crud: { add: context.addJointType, update: context.updateJointType, delete: context.deleteJointType } },
@@ -141,8 +141,17 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   const openModal = (item: SettingsItem | null) => {
     setCurrentItem(item);
     setFormData(item ? { ...item } : (itemType === 'materials' ? { name: '', minStockLevel: 0 } : {name: ''}));
-    if (itemType === 'materials' && !item) {
-        setInitialStock(context.warehouses.map(wh => ({ warehouseId: wh.id, quantity: 0 })));
+    
+    if (itemType === 'materials') {
+      if (item) { // Editing existing material
+        const currentStock = context.warehouses.map(wh => {
+          const stockItem = context.inventory.find(inv => inv.materialId === item.id && inv.warehouseId === wh.id);
+          return { warehouseId: wh.id, quantity: stockItem?.quantity || 0 };
+        });
+        setMaterialStock(currentStock);
+      } else { // Adding new material
+        setMaterialStock(context.warehouses.map(wh => ({ warehouseId: wh.id, quantity: 0 })));
+      }
     }
     setModalOpen(true);
   };
@@ -151,7 +160,7 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
     setModalOpen(false);
     setCurrentItem(null);
     setFormData({});
-    setInitialStock([]);
+    setMaterialStock([]);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -160,7 +169,7 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   };
 
   const handleStockChange = (warehouseId: string, quantity: number) => {
-    setInitialStock(prev => prev.map(stock => 
+    setMaterialStock(prev => prev.map(stock => 
         stock.warehouseId === warehouseId ? { ...stock, quantity: Math.max(0, quantity) } : stock
     ));
   };
@@ -170,15 +179,20 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
         alert("الاسم حقل مطلوب.");
         return;
     }
-    if (currentItem) {
-      config.crud.update({ ...formData, id: currentItem.id });
-    } else {
-      if (itemType === 'materials') {
-        const validStock = initialStock.filter(s => s.quantity > 0);
-        context.addMaterial(formData as Omit<Material, 'id' | 'account_id'>, validStock);
+
+    if (itemType === 'materials') {
+      if (currentItem) {
+        context.updateMaterial({ ...formData, id: currentItem.id }, materialStock);
       } else {
-        config.crud.add(formData as any);
+        const validStock = materialStock.filter(s => s.quantity > 0);
+        context.addMaterial(formData as Omit<Material, 'id' | 'account_id'>, validStock);
       }
+    } else {
+        if (currentItem) {
+            config.crud.update({ ...formData, id: currentItem.id });
+        } else {
+            config.crud.add(formData as any);
+        }
     }
     closeModal();
   };
@@ -226,19 +240,20 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
 
   const renderModalContent = () => {
     const fields = config.fields.map(field => renderField(field));
-    if (itemType === 'materials' && !currentItem) {
+    if (itemType === 'materials') {
+      const stockTitle = currentItem ? "المخزون" : "المخزون المبدئي (اختياري)";
       return (
         <>
           {fields}
           <div className="mt-4 pt-4 border-t">
-            <h4 className="block text-black text-sm font-bold mb-2">المخزون المبدئي (اختياري)</h4>
+            <h4 className="block text-black text-sm font-bold mb-2">{stockTitle}</h4>
             <div className="space-y-2">
               {context.warehouses.map(warehouse => (
                 <div key={warehouse.id} className="flex items-center justify-between">
                   <label className="text-gray-700">{warehouse.name}</label>
                   <input
                     type="number"
-                    value={initialStock.find(s => s.warehouseId === warehouse.id)?.quantity || 0}
+                    value={materialStock.find(s => s.warehouseId === warehouse.id)?.quantity ?? 0}
                     onChange={e => handleStockChange(warehouse.id, parseInt(e.target.value) || 0)}
                     className="w-24 p-2 border rounded"
                     min="0"

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Material, Warehouse } from '../types';
 import Modal from '../components/Modal';
-import { ArrowRightLeft, AlertTriangle, Plus, PlusCircle, MinusCircle } from 'lucide-react';
+import { ArrowRightLeft, AlertTriangle, PlusCircle, MinusCircle } from 'lucide-react';
 
 interface StockItem {
   materialId: string;

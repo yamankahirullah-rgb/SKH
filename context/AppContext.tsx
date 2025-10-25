@@ -101,23 +101,89 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     fetchData();
   }, [fetchData]);
 
-  // NOTE: The following functions for operations and stock transfers assume you have created
-  // corresponding RPC/edge functions in your Supabase project to handle the logic atomically
-  // (e.g., updating inventory when an operation is created/deleted).
-
   const addOperation = useCallback(async (operationData: Omit<Operation, 'id' | 'created_at' | 'account_id'>) => {
-    if (!profile?.account_id) return;
-    // This assumes an RPC 'add_operation' that handles inventory deduction.
-    const { error } = await supabase.rpc('add_operation', { p_account_id: profile.account_id, ...operationData });
-    if (error) console.error("Error adding operation:", error);
-    else await fetchData();
-  }, [profile, fetchData]);
+    if (!profile?.account_id) {
+      alert("Profile not loaded. Cannot add operation.");
+      return;
+    }
+
+    // Step 1: Pre-flight check in client-side state to prevent obvious failures
+    if (operationData.materialsUsed && operationData.materialsUsed.length > 0) {
+        for (const usedMaterial of operationData.materialsUsed) {
+            const inventoryItem = inventory.find(i => i.materialId === usedMaterial.materialId && i.warehouseId === operationData.warehouseId);
+            if (!inventoryItem || inventoryItem.quantity < usedMaterial.quantity) {
+                const materialName = materials.find(m => m.id === usedMaterial.materialId)?.name || `ID ${usedMaterial.materialId}`;
+                const availableStock = inventoryItem ? inventoryItem.quantity : 0;
+                alert(`Operation not added. Not enough stock for "${materialName}".\nAvailable: ${availableStock}, Required: ${usedMaterial.quantity}.`);
+                return; // Abort
+            }
+        }
+    }
+
+    // Step 2: Insert the operation record.
+    const { data: newOperation, error: operationError } = await supabase
+      .from('operations')
+      .insert([{ 
+        ...operationData, 
+        account_id: profile.account_id, 
+        materialsUsed: operationData.materialsUsed || [] // ensure materialsUsed is not undefined
+      }])
+      .select('id')
+      .single();
+
+    if (operationError || !newOperation) {
+      console.error("Error inserting operation:", operationError);
+      alert(`Failed to save the operation: ${operationError.message}`);
+      return;
+    }
+
+    // Step 3: Deduct stock from inventory.
+    if (operationData.materialsUsed && operationData.materialsUsed.length > 0) {
+      const updateErrors: string[] = [];
+      for (const usedMaterial of operationData.materialsUsed) {
+        // This is safer via RPC to prevent race conditions, but this is the best client-side approach.
+        const { data: currentItem, error: fetchError } = await supabase
+          .from('inventory')
+          .select('id, quantity')
+          .eq('materialId', usedMaterial.materialId)
+          .eq('warehouseId', operationData.warehouseId)
+          .single();
+
+        if (fetchError || !currentItem) {
+          const materialName = materials.find(m => m.id === usedMaterial.materialId)?.name || `ID ${usedMaterial.materialId}`;
+          updateErrors.push(`${materialName} (could not find item to update)`);
+          continue;
+        }
+
+        const newQuantity = currentItem.quantity - usedMaterial.quantity;
+        const { error: updateError } = await supabase
+          .from('inventory')
+          .update({ quantity: newQuantity })
+          .eq('id', currentItem.id);
+
+        if (updateError) {
+          const materialName = materials.find(m => m.id === usedMaterial.materialId)?.name || `ID ${usedMaterial.materialId}`;
+          updateErrors.push(`${materialName} (${updateError.message})`);
+        }
+      }
+
+      if (updateErrors.length > 0) {
+        alert(`CRITICAL WARNING: The operation was saved, but failed to deduct stock for the following items:\n- ${updateErrors.join('\n- ')}\n\nPlease manually adjust the inventory.`);
+      }
+    }
+
+    // Step 4: Refresh data to show the new operation.
+    await fetchData();
+  }, [profile, fetchData, inventory, materials]);
 
   const updateOperation = useCallback(async (operationData: Partial<Operation> & { id: string }) => {
     if (!profile?.account_id) return;
      // This assumes an RPC 'update_operation' that handles inventory adjustments.
     const { error } = await supabase.rpc('update_operation', { p_account_id: profile.account_id, p_operation_id: operationData.id, ...operationData });
-    if (error) console.error("Error updating operation:", error);
+    if (error) {
+        console.error("Error updating operation:", error);
+        alert(`Failed to update operation: ${error.message}. This may require a backend function.`);
+    }
     else await fetchData();
   }, [profile, fetchData]);
 
@@ -125,7 +191,10 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     if (!profile?.account_id) return;
     // This assumes an RPC 'delete_operation' that handles restocking inventory.
     const { error } = await supabase.rpc('delete_operation', { p_operation_id: operationId, p_account_id: profile.account_id });
-    if (error) console.error("Error deleting operation:", error);
+    if (error) {
+        console.error("Error deleting operation:", error);
+        alert(`Failed to delete operation: ${error.message}. This may require a backend function.`);
+    }
     else await fetchData();
   }, [profile, fetchData]);
 

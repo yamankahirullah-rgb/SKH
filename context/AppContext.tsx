@@ -210,8 +210,8 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     const { error } = await supabase.rpc('transfer_stock_multiple', {
         p_account_id: profile.account_id,
         p_items_to_transfer: itemsForDb,
-        p_from_warehouse: fromWarehouseId,
-        p_to_warehouse: toWarehouseId
+        p_from_warehouse_id: fromWarehouseId,
+        p_to_warehouse_id: toWarehouseId
     });
 
     if (error) {

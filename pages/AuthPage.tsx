@@ -17,8 +17,8 @@ const AuthPage: React.FC = () => {
     setMessage(null);
     try {
       if (isLogin) {
-        // Fix: Use `signIn` for Supabase v1 compatibility instead of `signInWithPassword`.
-        const { error } = await supabase.auth.signIn({ email, password });
+        // Revert to v2 API
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
         const { error } = await supabase.auth.signUp({ email, password });

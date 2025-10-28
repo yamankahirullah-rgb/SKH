@@ -11,8 +11,7 @@ const SetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Fix: Use v1-compatible onAuthStateChange and ensure subscription is cleaned up.
-    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY' || event === 'USER_UPDATED') {
         setMessage('يمكنك الآن تعيين كلمة المرور الخاصة بك.');
         setShowForm(true);
@@ -20,12 +19,13 @@ const SetPasswordPage: React.FC = () => {
     });
 
     // For invited users who are already logged in when they click the link
-    // Fix: Use synchronous `session()` method for v1 compatibility instead of `getSession()`.
-    const session = supabase.auth.session();
-    if (session) {
-        setMessage('مرحبًا بك! يرجى تعيين كلمة مرور لحسابك للمتابعة.');
-        setShowForm(true);
-    }
+    // Revert to v2 API
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+            setMessage('مرحبًا بك! يرجى تعيين كلمة مرور لحسابك للمتابعة.');
+            setShowForm(true);
+        }
+    });
 
     return () => {
       subscription?.unsubscribe();
@@ -42,8 +42,8 @@ const SetPasswordPage: React.FC = () => {
     setError(null);
     setMessage(null);
 
-    // Fix: Use `update` for v1 compatibility instead of `updateUser`.
-    const { data: { user }, error: updateUserError } = await supabase.auth.update({ password });
+    // Revert to v2 API
+    const { data: { user }, error: updateUserError } = await supabase.auth.updateUser({ password });
 
     if (updateUserError) {
       setError(updateUserError.message);

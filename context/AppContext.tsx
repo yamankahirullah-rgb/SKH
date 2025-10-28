@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-// Fix: Use `import type` for Session to correct module resolution issues with older Supabase versions.
-import type { Session } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase/client';
 import { Operation, Material, Warehouse, JointType, Technician, OperationType, InventoryItem, StockTransfer, Profile, UsedMaterial } from '../types';
 

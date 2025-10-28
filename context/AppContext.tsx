@@ -201,11 +201,12 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
   const transferMultipleStock = useCallback(async (items: { materialId: string; quantity: number }[], fromWarehouseId: string, toWarehouseId: string) => {
     if (!profile?.account_id) return;
     // Assumes an RPC 'transfer_stock_multiple'
+    // The argument names are set to match the specific signature the database function expects.
     const { error } = await supabase.rpc('transfer_stock_multiple', {
         p_account_id: profile.account_id,
-        p_items_to_transfer: items,
-        p_from_warehouse: fromWarehouseId,
-        p_to_warehouse: toWarehouseId
+        items_to_transfer: items,
+        from_warehouse: fromWarehouseId,
+        to_warehouse: toWarehouseId
     });
     if (error) {
         console.error("Error transferring stock:", error);

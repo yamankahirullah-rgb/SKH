@@ -199,28 +199,33 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
   }, [profile, fetchData]);
 
   const transferMultipleStock = useCallback(async (items: { materialId: string; quantity: number }[], fromWarehouseId: string, toWarehouseId: string) => {
-    if (!profile?.account_id) return;
+    if (!profile?.account_id || !session.user.id) {
+      alert("بيانات المستخدم غير مكتملة. لا يمكن إتمام التحويل.");
+      return;
+    }
     
-    // Convert item keys to snake_case for the RPC function
-    const itemsForDb = items.map(item => ({
-        material_id: item.materialId,
-        quantity: item.quantity
-    }));
+    // The database function `transfer_multiple_stock` expects:
+    // 1. A parameter named `items` (not `p_items_to_transfer`).
+    // 2. The objects inside the `items` array to have a key `materialId` (camelCase).
+    // 3. A `p_user_id` to log who made the transfer.
+    const validItems = items.filter(item => item.materialId && item.quantity > 0);
 
-    const { error } = await supabase.rpc('transfer_stock_multiple', {
-        p_account_id: profile.account_id,
-        p_items_to_transfer: itemsForDb,
+    const { error } = await supabase.rpc('transfer_multiple_stock', {
+        items: validItems, // Correct parameter name and no key conversion needed
         p_from_warehouse_id: fromWarehouseId,
-        p_to_warehouse_id: toWarehouseId
+        p_to_warehouse_id: toWarehouseId,
+        p_account_id: profile.account_id,
+        p_user_id: session.user.id, // Added missing user ID
     });
+
 
     if (error) {
         console.error("Error transferring stock:", error);
-        alert(`Failed to transfer stock: ${error.message}`);
+        alert(`فشل تحويل المخزون: ${error.message}`);
     } else {
         await fetchData();
     }
-  }, [profile, fetchData]);
+  }, [profile, session, fetchData]);
   
   const createCrudFunctions = <T extends {id: string, account_id: string}>(tableName: string) => {
       const addItem = async (item: Omit<T, 'id' | 'account_id'>) => {

@@ -200,18 +200,26 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
 
   const transferMultipleStock = useCallback(async (items: { materialId: string; quantity: number }[], fromWarehouseId: string, toWarehouseId: string) => {
     if (!profile?.account_id) return;
-    // Assumes an RPC 'transfer_stock_multiple'
+    
+    // Convert item keys to snake_case for the RPC function
+    const itemsForDb = items.map(item => ({
+        material_id: item.materialId,
+        quantity: item.quantity
+    }));
+
     const { error } = await supabase.rpc('transfer_stock_multiple', {
         p_account_id: profile.account_id,
-        p_items_to_transfer: items,
+        p_items_to_transfer: itemsForDb,
         p_from_warehouse: fromWarehouseId,
         p_to_warehouse: toWarehouseId
     });
+
     if (error) {
         console.error("Error transferring stock:", error);
         alert(`Failed to transfer stock: ${error.message}`);
+    } else {
+        await fetchData();
     }
-    else await fetchData();
   }, [profile, fetchData]);
   
   const createCrudFunctions = <T extends {id: string, account_id: string}>(tableName: string) => {

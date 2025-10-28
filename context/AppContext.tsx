@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Session } from '@supabase/supabase-js';
+// Fix: Use `import type` for Session to correct module resolution issues with older Supabase versions.
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase/client';
 import { Operation, Material, Warehouse, JointType, Technician, OperationType, InventoryItem, StockTransfer, Profile, UsedMaterial } from '../types';
 
@@ -203,9 +204,9 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     // Assumes an RPC 'transfer_stock_multiple'
     const { error } = await supabase.rpc('transfer_stock_multiple', {
         p_account_id: profile.account_id,
-        items_to_transfer: items,
-        from_warehouse: fromWarehouseId,
-        to_warehouse: toWarehouseId
+        p_items_to_transfer: items,
+        p_from_warehouse: fromWarehouseId,
+        p_to_warehouse: toWarehouseId
     });
     if (error) {
         console.error("Error transferring stock:", error);

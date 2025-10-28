@@ -25,7 +25,8 @@ const AccountSetupPage: React.FC = () => {
             if (!accountData) throw new Error("Could not create account.");
 
             // 2. Get the current user.
-            const { data: { user } } = await supabase.auth.getUser();
+            // Fix: Use the synchronous `user()` method for Supabase v1 compatibility instead of `getUser()`.
+            const user = supabase.auth.user();
             if (!user) throw new Error("User not found.");
 
             // 3. Update the user's profile with the new account_id AND mark password as set.

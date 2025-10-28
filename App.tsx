@@ -13,23 +13,27 @@ import AuditLogPage from './pages/AuditLogPage';
 import AccountSetupPage from './pages/AccountSetupPage';
 import SetPasswordPage from './pages/SetPasswordPage';
 import { supabase } from './supabase/client';
-import { Session } from '@supabase/supabase-js';
+// Fix: Use `import type` for Session to correct module resolution issues with older Supabase versions.
+import type { Session } from '@supabase/supabase-js';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Fix: Replace `getSession` and `onAuthStateChange` with v1-compatible versions.
+    // Get initial session synchronously.
+    setSession(supabase.auth.session());
+    setLoading(false);
+
+    // Listen for auth state changes.
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      authListener?.unsubscribe();
+    };
   }, []);
 
   if (loading) {

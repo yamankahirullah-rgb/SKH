@@ -82,7 +82,16 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
 
             setProfiles(profilesRes.data || []);
             setOperations(operationsRes.data || []);
-            setMaterials(materialsRes.data || []);
+            
+            // Transform materials data: `null` in DB means generic, represented by `['jt4']` on client
+            const transformedMaterials = (materialsRes.data || []).map(m => {
+                if (m.jointTypeIds === null) {
+                    return { ...m, jointTypeIds: ['jt4'] };
+                }
+                return m;
+            });
+            setMaterials(transformedMaterials);
+
             setWarehouses(warehousesRes.data || []);
             setJointTypes(jointTypesRes.data || []);
             setTechnicians(techniciansRes.data || []);
@@ -199,33 +208,20 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
   }, [profile, fetchData]);
 
   const transferMultipleStock = useCallback(async (items: { materialId: string; quantity: number }[], fromWarehouseId: string, toWarehouseId: string) => {
-    if (!profile?.account_id || !session.user.id) {
-      alert("بيانات المستخدم غير مكتملة. لا يمكن إتمام التحويل.");
-      return;
-    }
-    
-    // The database function `transfer_multiple_stock` expects:
-    // 1. A parameter named `items` (not `p_items_to_transfer`).
-    // 2. The objects inside the `items` array to have a key `materialId` (camelCase).
-    // 3. A `p_user_id` to log who made the transfer.
-    const validItems = items.filter(item => item.materialId && item.quantity > 0);
-
-    const { error } = await supabase.rpc('transfer_multiple_stock', {
-        items: validItems, // Correct parameter name and no key conversion needed
-        p_from_warehouse_id: fromWarehouseId,
-        p_to_warehouse_id: toWarehouseId,
+    if (!profile?.account_id) return;
+    // Assumes an RPC 'transfer_stock_multiple'
+    const { error } = await supabase.rpc('transfer_stock_multiple', {
         p_account_id: profile.account_id,
-        p_user_id: session.user.id, // Added missing user ID
+        items_to_transfer: items,
+        from_warehouse: fromWarehouseId,
+        to_warehouse: toWarehouseId
     });
-
-
     if (error) {
         console.error("Error transferring stock:", error);
-        alert(`فشل تحويل المخزون: ${error.message}`);
-    } else {
-        await fetchData();
+        alert(`Failed to transfer stock: ${error.message}`);
     }
-  }, [profile, session, fetchData]);
+    else await fetchData();
+  }, [profile, fetchData]);
   
   const createCrudFunctions = <T extends {id: string, account_id: string}>(tableName: string) => {
       const addItem = async (item: Omit<T, 'id' | 'account_id'>) => {
@@ -250,9 +246,16 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     initialStock?: { warehouseId: string; quantity: number }[]
   ) => {
       if (!profile?.account_id) return;
+
+      // Transform client-side `['jt4']` representation to `null` for the database
+      const dataToInsert = { ...materialData };
+      if (Array.isArray(dataToInsert.jointTypeIds) && dataToInsert.jointTypeIds.includes('jt4')) {
+          (dataToInsert as { jointTypeIds?: string[] | null }).jointTypeIds = null;
+      }
+
       const { data: newMaterial, error: materialError } = await supabase
           .from('materials')
-          .insert([{ ...materialData, account_id: profile.account_id }])
+          .insert([{ ...dataToInsert, account_id: profile.account_id }])
           .select('id')
           .single();
 
@@ -316,6 +319,14 @@ export const AppProvider: React.FC<{ children: ReactNode; session: Session }> = 
     if (!profile?.account_id) return;
 
     const { id, ...updateData } = materialData;
+    
+    // Transform client-side `['jt4']` representation to `null` for the database
+    if (Object.prototype.hasOwnProperty.call(updateData, 'jointTypeIds')) {
+        const ids = updateData.jointTypeIds;
+        if (Array.isArray(ids) && ids.includes('jt4')) {
+            (updateData as { jointTypeIds?: string[] | null }).jointTypeIds = null;
+        }
+    }
     
     // 1. Update material details
     const { error: materialError } = await supabase

@@ -36,7 +36,7 @@ export interface Material {
   id: string;
   name: string;
   minStockLevel: number;
-  jointTypeId?: string | null; // Can be linked to a joint type or be generic
+  jointTypeIds?: string[] | null; // Can be linked to multiple joint types or be generic
   account_id: string;
 }
 

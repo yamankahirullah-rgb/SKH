@@ -268,7 +268,7 @@ const OperationsPage: React.FC = () => {
                 <div key={index} className="flex items-center gap-2 mb-2">
                     <select value={used.materialId} onChange={e => handleMaterialChange(index, 'materialId', e.target.value)} className="w-full p-2 border rounded">
                         <option value="">اختر المادة</option>
-                        {materials.filter(m => formData.jointTypeId ? (m.jointTypeId === formData.jointTypeId || m.jointTypeId === 'jt4') : true).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        {materials.filter(m => formData.jointTypeId ? (m.jointTypeIds?.includes(formData.jointTypeId) || m.jointTypeIds?.includes('jt4')) : true).map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                     </select>
                     <input type="number" value={used.quantity} onChange={e => handleMaterialChange(index, 'quantity', Number(e.target.value))} className="w-24 p-2 border rounded" min="1" />
                      <button onClick={() => removeMaterialField(index)} className="text-red-500"><MinusCircle size={20} /></button>

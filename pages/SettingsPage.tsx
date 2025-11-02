@@ -130,7 +130,7 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   
   const typeConfig: { [key in ItemType]: { title: string; fields: string[]; data: SettingsItem[]; crud: any } } = {
     jointTypes: { title: 'أنواع المفاصل', fields: ['name'], data: context.jointTypes, crud: { add: context.addJointType, update: context.updateJointType, delete: context.deleteJointType } },
-    materials: { title: 'المواد', fields: ['name', 'minStockLevel', 'jointTypeId'], data: context.materials, crud: { add: context.addMaterial, update: context.updateMaterial, delete: context.deleteMaterial } },
+    materials: { title: 'المواد', fields: ['name', 'minStockLevel', 'jointTypeIds'], data: context.materials, crud: { add: context.addMaterial, update: context.updateMaterial, delete: context.deleteMaterial } },
     warehouses: { title: 'المستودعات', fields: ['name'], data: context.warehouses, crud: { add: context.addWarehouse, update: context.updateWarehouse, delete: context.deleteWarehouse } },
     technicians: { title: 'الفنيون', fields: ['name'], data: context.technicians, crud: { add: context.addTechnician, update: context.updateTechnician, delete: context.deleteTechnician } },
     operationTypes: { title: 'أنواع العمليات', fields: ['name'], data: context.operationTypes, crud: { add: context.addOperationType, update: context.updateOperationType, delete: context.deleteOperationType } },
@@ -140,7 +140,7 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
 
   const openModal = (item: SettingsItem | null) => {
     setCurrentItem(item);
-    setFormData(item ? { ...item } : (itemType === 'materials' ? { name: '', minStockLevel: 0 } : {name: ''}));
+    setFormData(item ? { ...item } : (itemType === 'materials' ? { name: '', minStockLevel: 0, jointTypeIds: [] } : {name: ''}));
     
     if (itemType === 'materials') {
       if (item) { // Editing existing material
@@ -166,6 +166,14 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: name === 'minStockLevel' ? Math.max(0, Number(value)) : value }));
+  };
+
+  const handleJointTypeSelectionChange = (jointTypeId: string) => {
+      const currentIds = (formData as Partial<Material>).jointTypeIds || [];
+      const newIds = currentIds.includes(jointTypeId)
+          ? currentIds.filter(id => id !== jointTypeId)
+          : [...currentIds, jointTypeId];
+      setFormData(prev => ({ ...prev, jointTypeIds: newIds }));
   };
 
   const handleStockChange = (warehouseId: string, quantity: number) => {
@@ -210,17 +218,28 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
   };
   
   const renderField = (field: string) => {
-    if (field === 'jointTypeId') {
+    if (field === 'jointTypeIds') {
+        const allJointTypes = [...context.jointTypes, { id: 'jt4', name: 'عام', account_id: '' }];
+        const selectedIds = (formData as Partial<Material>).jointTypeIds || [];
+
         return (
-             <div key={field} className="mb-4">
-                <label className="block text-black text-sm font-bold mb-2">نوع المفصل</label>
-                <select name="jointTypeId" value={(formData as Material).jointTypeId || ''} onChange={handleChange} className="w-full p-2 border rounded">
-                    <option value="">اختر نوع المفصل (اختياري)</option>
-                    {context.jointTypes.map(jt => <option key={jt.id} value={jt.id}>{jt.name}</option>)}
-                     <option key="jt4" value="jt4">عام</option>
-                </select>
+            <div key={field} className="mb-4">
+                <label className="block text-black text-sm font-bold mb-2">أنواع المفاصل</label>
+                <div className="border rounded-lg p-2 grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                    {allJointTypes.map(jt => (
+                        <label key={jt.id} className="flex items-center space-x-2 space-x-reverse p-2 rounded-md hover:bg-gray-100 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={selectedIds.includes(jt.id)}
+                                onChange={() => handleJointTypeSelectionChange(jt.id)}
+                                className="form-checkbox h-5 w-5 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                            />
+                            <span className="text-black">{jt.name}</span>
+                        </label>
+                    ))}
+                </div>
             </div>
-        )
+        );
     }
     const labelMap: { [key: string]: string } = { name: 'الاسم', minStockLevel: 'الحد الأدنى للمخزون' }
     return (
@@ -292,7 +311,14 @@ const SettingsTab: React.FC<{ itemType: ItemType }> = ({ itemType }) => {
                       <tr key={item.id} className="hover:bg-gray-50">
                           <td className="p-3 text-black">{item.name}</td>
                           {itemType === 'materials' && <td className="p-3 text-black">{(item as Material).minStockLevel}</td>}
-                          {itemType === 'materials' && <td className="p-3 text-black">{context.jointTypes.find(jt => jt.id === (item as Material).jointTypeId)?.name || ((item as Material).jointTypeId ? 'عام' : '-')}</td>}
+                          {itemType === 'materials' && <td className="p-3 text-black">
+                            {((item as Material).jointTypeIds || [])
+                                .map(id => {
+                                    if (id === 'jt4') return 'عام';
+                                    return context.jointTypes.find(jt => jt.id === id)?.name || id;
+                                })
+                                .join(', ') || '-'}
+                          </td>}
                           <td className="p-3">
                               <div className="flex items-center justify-end space-x-2 space-x-reverse">
                                   <button onClick={() => openModal(item)} className="text-gray-500 hover:text-red-600"><Edit size={20} /></button>
